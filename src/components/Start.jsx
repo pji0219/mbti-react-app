@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import styled from 'styled-components';
 import { next } from '../store/modules/mbti';
+import { init } from '../store/modules/show';
 import OrangeButton from './OrangeButton';
 
 const Header = styled.header`
@@ -20,19 +21,88 @@ function Start() {
   const [counts, setCounts] = useState(0);
   const dispatch = useDispatch();
 
-  useEffect(() => {
-    async function fetchData() {
-      const resCount = await fetch('http://localhost:3001/data/counts');
-      if (resCount.status === 200) {
-        const num = await resCount.json();
-        if (num[0].counts !== 0) setCounts(num[0].counts);
-        else {
-          throw new Error('통신 이상');
-        }
+  function makeData(survey, explanation) {
+    const initData = { survey: [], explanation: {} };
+    if (initData.survey.length === 0) {
+      for (let i = 0; i < survey.length; i = i + 2) {
+        initData.survey.push({
+          question: survey[i].QUESTION_TEXT,
+          answer: [
+            {
+              text: survey[i].ANSWER_TEXT,
+              result: survey[i].RESULT,
+            },
+            {
+              text: survey[i + 1].ANSWER_TEXT,
+              result: survey[i + 1].RESULT,
+            },
+          ],
+        });
+      }
+      for (let i = 0; i < explanation.length; i++) {
+        initData.explanation[explanation[i].MBTI_TYPE] = {
+          explanation: explanation[i].EXPLAINATION,
+          img: explanation[i].IMG_SRC,
+        };
       }
     }
-    fetchData();
-  }, []);
+    return initData;
+  }
+
+  async function sqlFetchData() {
+    const resCount = await fetch('http://localhost:3001/data/counts');
+    if (resCount.status === 200) {
+      const num = await resCount.json();
+      if (num[0].counts !== 0) setCounts(num[0].counts);
+      else {
+        throw new Error('통신 이상');
+      }
+    }
+
+    const resSurvey = await fetch('http://localhost:3001/data/survey');
+    if (resSurvey.status === 200) {
+      const surveyData = await resSurvey.json();
+      // explanation Table 의 데이터 받아오기
+      const resExplanation = await fetch(
+        'http://localhost:4000/data/explanation'
+      );
+      if (resExplanation.status === 200) {
+        const explanationData = await resExplanation.json();
+        const madeData = makeData(surveyData, explanationData);
+        dispatch(init(madeData));
+      } else {
+        throw new Error('통신 이상');
+      }
+    } else {
+      throw new Error('통신 이상');
+    }
+  }
+
+  async function mongoFetchData() {
+    const resCount = await fetch('http://localhost:3001/mongo/count');
+    if (resCount.status === 200) {
+      const num = await resCount.json();
+      if (num[0].counts !== 0) setCounts(num[0].counts);
+      else {
+        throw new Error('통신 이상');
+      }
+    }
+
+    // 설문 전체 데이터 받아 오기
+    const resData = await fetch('http://localhost:3001/mongo/getdata');
+    if (resData.status === 200) {
+      const data = await resData.json();
+      if (data[0].survey.length !== 0) {
+        dispatch(init(data[0]));
+      }
+    } else {
+      throw new Error('통신 이상');
+    }
+  }
+
+  useEffect(() => {
+    sqlFetchData();
+  }, []); //
 
   return (
     <>

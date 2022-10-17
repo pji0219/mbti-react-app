@@ -35,7 +35,7 @@ function Show() {
 
   useEffect(() => {
     async function sendData() {
-      const resInc = await fetch('http://localhost:3001/data/inccount', {
+      const resInc = await fetch('http://localhost:3001/mongo/inccount', {
         method: 'POST',
       });
       if (resInc.status === 200) {
